@@ -1,0 +1,75 @@
+---
+title: "Practical Machine Learning Course Project"
+date: "May 24, 2015"
+output: html_document
+---
+##Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+#Download data
+
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(corrplot)
+urlTrain<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+urlTest<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+dataTrain<-"./data/pml-training.csv"
+dataTest<-"./data/pml-testing.csv"
+if (!file.exists("./data")) {
+  dir.create("./data")
+}
+if (!file.exists("./data/pml-training.csv")) {
+  download.file(urlTrain, destfile="./data/pml-training.csv", method="curl")
+}
+if (!file.exists("./data/pml-testing.csv")) {
+  download.file(urlTest, destfile="./data/pml-testing.csv", method="curl")
+}
+dataTrain<-read.csv("./data/pml-training.csv")
+dataTest<-read.csv("./data/pml-testing.csv")
+```
+The dataset coontain 160 variables and 19622/20 observations in the training/testing data. We cleaned up the variables with NA, non-data variables, and all factor variables.
+```{r}
+classeTrain<-dataTrain$classe
+dataTrain <- dataTrain[, colSums(is.na(dataTrain)) == 0] 
+dataTrain<-dataTrain[,sapply(dataTrain, is.numeric)][,5:56]
+dataTrain$classe<-classeTrain
+
+dataTest <- dataTest[, colSums(is.na(dataTest)) == 0] 
+dataTest <- dataTest[ ,8:59]
+```
+
+##Split data
+We split the training dataset into 70% training and 30% validation.
+```{r}
+set.seed(999)
+inTrain <- createDataPartition(dataTrain$classe, p=0.70, list=F)
+trainData <- dataTrain[inTrain, ]
+testData <- dataTrain[-inTrain, ]
+```
+##Building prediction model
+We use random forest algorithm to fit the prediction model and use a 5-fold crosse validation.
+```{r}
+controlRf <- trainControl(method="cv", 5)
+modelRf <- train(classe ~ ., data=trainData, method="rf", trControl=controlRf, ntree=250)
+modelRf
+```
+
+```{r}
+predictRf <- predict(modelRf, testData)
+confusionMatrix(testData$classe, predictRf)
+accuracy <- postResample(predictRf, testData$classe)
+accuracy
+oose <- 1 - as.numeric(confusionMatrix(testData$classe, predictRf)$overall[1])
+oose
+```
+the estimated accuracy of the model is 99% and the estimated oose is 0.58%.
+##Prediction
+```{r}
+predtest<- predict(modelRf, newdata=dataTest)
+predtest
+```
+
+
